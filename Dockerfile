@@ -30,7 +30,8 @@ RUN ./configure \
     --without-libarchive \
     --disable-fault-handling \
     --without-pam \
-    --without-gettext
+    --without-gettext \
+    --with-shared-modules='!vfs_snapper'
 
 # Build only smbcacls
 RUN make -j$(nproc) bin/smbcacls
@@ -43,14 +44,18 @@ RUN apk add --no-cache \
     gnutls talloc tdb tevent popt iniparser \
     libarchive
 
-# Copy the compiled smbcacls binary
-COPY --from=builder /build/samba/bin/default/source3/utils/smbcacls /usr/local/bin/smbcacls
+# Copy the entire bin directory to preserve library structure
+COPY --from=builder /build/samba/bin/ /usr/local/samba/bin/
 
-# Make it executable
-RUN chmod +x /usr/local/bin/smbcacls
+# Create entrypoint script that sets up library paths dynamically
+RUN cat > /entrypoint.sh <<'EOF'
+#!/bin/sh
+# Build LD_LIBRARY_PATH from all directories containing .so files
+export LD_LIBRARY_PATH=$(find /usr/local/samba/bin -name "*.so*" -exec dirname {} \; | sort -u | tr "\n" ":")
+exec /usr/local/samba/bin/default/source3/utils/smbcacls "$@"
+EOF
 
-# Test the binary
-RUN /usr/local/bin/smbcacls --help | grep -q max-depth && echo "Custom smbcacls with --max-depth support"
+RUN chmod +x /entrypoint.sh
 
-ENTRYPOINT ["/usr/local/bin/smbcacls"]
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["--help"]
