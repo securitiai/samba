@@ -3,7 +3,7 @@ FROM alpine:3.19 AS builder
 
 # Install build dependencies including git
 RUN apk add --no-cache \
-    gcc g++ make python3 perl flex bison m4 \
+    gcc g++ make python3 perl perl-parse-yapp flex bison m4 \
     gnutls-dev talloc-dev tdb-dev tevent-dev popt-dev iniparser-dev \
     libarchive-dev git
 
