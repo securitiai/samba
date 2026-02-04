@@ -1890,7 +1890,7 @@ static int dump_dacl_dirtree(struct dump_context *dump_ctx)
 	int result;
 
 	/* Before processing, verify that we are within the depth limits. */
-	if (dump_ctx->current_depth < max_depth) {
+	if (dump_ctx->current_depth > max_depth) {
 
 			DBG_ERR("out of depth: %d (%d)\n", dump_ctx->current_depth, max_depth);
 			goto out;

@@ -9,7 +9,7 @@ RUN apk add --no-cache \
 
 # Clone forked Samba repo with custom changes (--max-depth support)
 ARG SAMBA_REPO=https://github.com/securitiai/samba.git
-ARG SAMBA_BRANCH=custom-max-depth
+ARG SAMBA_BRANCH=master
 
 WORKDIR /build
 RUN git clone --depth 1 --branch ${SAMBA_BRANCH} ${SAMBA_REPO} samba
