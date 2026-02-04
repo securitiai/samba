@@ -1348,7 +1348,6 @@ static NTSTATUS cacl_set_cb(struct file_info *f,
 		 */
 		dir_cbstate = *cbstate;
 		dir_cbstate.cli = targetcli;
-		dir_cbstate.current_depth = cbstate->current_depth + 1;
 
 		/*
 		 * propagate any inherited ace from our parent
@@ -1365,18 +1364,6 @@ static NTSTATUS cacl_set_cb(struct file_info *f,
 		status = get_inheritable_aces(dirctx, caclfile,
 						      &dir_cbstate);
 		if (!NT_STATUS_IS_OK(status)) {
-			goto out;
-		}
-
-		/*
-		 * Check if we should recurse based on max_depth
-		 * max_depth == -1 means unlimited (default)
-		 * max_depth == 0 means current directory only (no subdirs)
-		 * max_depth == 1 means one level deep, etc.
-		 */
-		if (max_depth >= 0 && dir_cbstate.current_depth > max_depth) {
-			/* Stop recursing, we've reached max depth */
-			status = NT_STATUS_OK;
 			goto out;
 		}
 
