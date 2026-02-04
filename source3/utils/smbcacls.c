@@ -43,11 +43,13 @@ static int inheritance = 0;
 static const char *save_file = NULL;
 static const char *restore_file = NULL;
 static int recurse;
+static int max_depth = -1;
 static int test_args;
 static int sddl;
 static int query_sec_info = -1;
 static int set_sec_info = -1;
 static bool want_mxac;
+static bool do_recurse;
 
 static const char *domain_sid = NULL;
 
@@ -64,6 +66,7 @@ struct cacl_callback_state {
 	char *the_acl;
 	bool acl_no_propagate;
 	bool numeric;
+	int current_depth;
 };
 
 static NTSTATUS cli_lsa_lookup_domain_sid(struct cli_state *cli,
@@ -1559,6 +1562,7 @@ struct dump_context {
 	int save_fd;
 	struct diritem *dir;
 	NTSTATUS status;
+	int current_depth;
 };
 
 static int write_dacl(struct dump_context *ctx,
@@ -1794,7 +1798,14 @@ static NTSTATUS cacl_dump_dacl_cb(struct file_info *f,
 			goto out;
 		}
 
-		DLIST_ADD_END(ctx->list, item);
+		/*
+		 * Check if we should add this directory for recursive processing
+		 * based on max_depth setting. Only add to list if we haven't
+		 * reached the maximum depth yet.
+		 */
+		if (max_depth < 0 || ctx->current_depth < max_depth) {
+			DLIST_ADD_END(ctx->list, item);
+		}
 
 	} else {
 		unresolved = sanitize_dirname(ctx, ctx->dir->dirname);
@@ -1864,6 +1875,14 @@ static int dump_dacl_dirtree(struct dump_context *dump_ctx)
 	struct diritem *item = NULL;
 	struct dump_context *new_dump_ctx = NULL;
 	int result;
+
+	/* Before processing, verify that we are within the depth limits. */
+	if (dump_ctx->current_depth > max_depth) {
+
+			DBG_ERR("out of depth: %d (%d)\n", dump_ctx->current_depth, max_depth);
+			goto out;
+	}
+
 	for (item = dump_ctx->list; item; item = item->next) {
 		uint16_t attribute = FILE_ATTRIBUTE_DIRECTORY
 		    | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN;
@@ -1899,6 +1918,7 @@ static int dump_dacl_dirtree(struct dump_context *dump_ctx)
 		new_dump_ctx->stats = dump_ctx->stats;
 		new_dump_ctx->dir = item;
 		new_dump_ctx->cli = item->targetcli;
+		new_dump_ctx->current_depth = dump_ctx->current_depth + 1;
 
 		mask = talloc_asprintf(new_dump_ctx, "%s*",
 				       new_dump_ctx->dir->targetpath);
@@ -1978,6 +1998,7 @@ static int cacl_dump_dacl(struct cli_state *cli,
 	dump_ctx->creds = creds;
 	dump_ctx->cli = cli;
 	dump_ctx->stats = &stats;
+	dump_ctx->current_depth = 0;
 
 	/* ensure we have a filename that starts with '\' */
 	if (!filename || *filename != DIRSEP_CHAR) {
@@ -2026,7 +2047,7 @@ static int cacl_dump_dacl(struct cli_state *cli,
 	}
 
 	write_dacl(dump_ctx, targetcli, targetpath, filename);
-	if (isdirectory && recurse) {
+	if (isdirectory && do_recurse) {
 		item = talloc_zero(dump_ctx, struct diritem);
 		if (!item) {
 			result = EXIT_FAILED;
@@ -2354,6 +2375,16 @@ int main(int argc, char *argv[])
 				      " below. (only applies to save option)",
 		},
 		{
+			.longName   = "max-depth",
+			.shortName  = 0,
+			.argInfo    = POPT_ARG_INT,
+			.arg        = &max_depth,
+			.val        = 0,
+			.descrip    = "Maximum recursion depth (0=current dir only, "
+				      "1=one level deep, -1=unlimited)",
+			.argDescrip = "N"
+		},
+		{
 			.longName   = "numeric",
 			.shortName  = 0,
 			.argInfo    = POPT_ARG_NONE,
@@ -2583,6 +2614,9 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	/* Reconcile depth and recurse options. */
+	do_recurse = recurse && (max_depth != 0);
+
 	/* Perform requested action */
 
 	if (change_mode == REQUEST_INHERIT) {
@@ -2597,6 +2631,7 @@ int main(int argc, char *argv[])
 				.mode = mode,
 				.the_acl = the_acl,
 				.numeric = numeric,
+				.current_depth = 0,
 			};
 			result = inheritance_cacl_set(targetfile, &cbstate);
 		} else {
