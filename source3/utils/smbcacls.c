@@ -1597,9 +1597,6 @@ static int write_dacl(struct dump_context *ctx,
 		goto out;
 	}
 
-	sd->owner_sid = NULL;
-	sd->group_sid = NULL;
-
 	str = sddl_encode(frame, sd, get_domain_sid(cli));
 	if (str == NULL) {
 		DBG_ERR("error processing %s couldn't encode DACL\n", filename);
