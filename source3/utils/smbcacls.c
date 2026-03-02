@@ -44,7 +44,7 @@ static const char *save_file = NULL;
 static const char *restore_file = NULL;
 static int recurse;
 static int max_depth = -1;
-static int skip_dirs = 0;
+static int skip_leaf_dirs = 0;
 static int test_args;
 static int sddl;
 static int query_sec_info = -1;
@@ -1778,7 +1778,7 @@ static NTSTATUS cacl_dump_dacl_cb(struct file_info *f,
 			goto out;
 		}
 
-		if (!skip_dirs &&
+		if (!(skip_leaf_dirs && (ctx->current_depth + 1) == max_depth) &&
 		    write_dacl(ctx,
 			       item->targetcli,
 			       item->targetpath, unresolved) != EXIT_OK) {
@@ -2045,7 +2045,7 @@ static int cacl_dump_dacl(struct cli_state *cli,
 		goto out;
 	}
 
-	if (!skip_dirs || !isdirectory) {
+	if (!isdirectory || !(skip_leaf_dirs && (dump_ctx->current_depth + 1) == max_depth)) {
 		write_dacl(dump_ctx, targetcli, targetpath, filename);
 	}
 	if (isdirectory && do_recurse) {
@@ -2386,14 +2386,14 @@ int main(int argc, char *argv[])
 			.argDescrip = "N"
 		},
 		{
-			.longName   = "skip-dirs",
+			.longName   = "skip-leaf-dirs",
 			.shortName  = 0,
 			.argInfo    = POPT_ARG_NONE,
-			.arg        = &skip_dirs,
+			.arg        = &skip_leaf_dirs,
 			.val        = 1,
-			.descrip    = "Skip collecting ACLs for directories, "
-				      "only collect ACLs for files "
-				      "(only applies to save option)",
+			.descrip    = "Skip collecting ACLs for leaf directories "
+				      "(where current_depth+1 == max_depth, "
+				      "only applies to save option)",
 		},
 		{
 			.longName   = "numeric",
