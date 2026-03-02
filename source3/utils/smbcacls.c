@@ -1778,7 +1778,7 @@ static NTSTATUS cacl_dump_dacl_cb(struct file_info *f,
 			goto out;
 		}
 
-		if (!(skip_leaf_dirs && (ctx->current_depth + 1) == max_depth) &&
+		if (!(skip_leaf_dirs && ctx->current_depth == max_depth) &&
 		    write_dacl(ctx,
 			       item->targetcli,
 			       item->targetpath, unresolved) != EXIT_OK) {
@@ -2045,9 +2045,7 @@ static int cacl_dump_dacl(struct cli_state *cli,
 		goto out;
 	}
 
-	if (!isdirectory || !(skip_leaf_dirs && (dump_ctx->current_depth + 1) == max_depth)) {
-		write_dacl(dump_ctx, targetcli, targetpath, filename);
-	}
+	write_dacl(dump_ctx, targetcli, targetpath, filename);
 	if (isdirectory && do_recurse) {
 		item = talloc_zero(dump_ctx, struct diritem);
 		if (!item) {
