@@ -44,6 +44,7 @@ static const char *save_file = NULL;
 static const char *restore_file = NULL;
 static int recurse;
 static int max_depth = -1;
+static int skip_leaf_dirs = 0;
 static int test_args;
 static int sddl;
 static int query_sec_info = -1;
@@ -1777,7 +1778,8 @@ static NTSTATUS cacl_dump_dacl_cb(struct file_info *f,
 			goto out;
 		}
 
-		if (write_dacl(ctx,
+		if (!(skip_leaf_dirs && ctx->current_depth == max_depth) &&
+		    write_dacl(ctx,
 			       item->targetcli,
 			       item->targetpath, unresolved) != EXIT_OK) {
 			status = NT_STATUS_UNSUCCESSFUL;
@@ -2380,6 +2382,16 @@ int main(int argc, char *argv[])
 			.descrip    = "Maximum recursion depth (0=current dir only, "
 				      "1=one level deep, -1=unlimited)",
 			.argDescrip = "N"
+		},
+		{
+			.longName   = "skip-leaf-dirs",
+			.shortName  = 0,
+			.argInfo    = POPT_ARG_NONE,
+			.arg        = &skip_leaf_dirs,
+			.val        = 1,
+			.descrip    = "Skip collecting ACLs for leaf directories "
+				      "(where current_depth+1 == max_depth, "
+				      "only applies to save option)",
 		},
 		{
 			.longName   = "numeric",
