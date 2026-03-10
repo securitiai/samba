@@ -1735,6 +1735,12 @@ static NTSTATUS cacl_dump_dacl_cb(struct file_info *f,
 			goto out;
 		}
 
+		if (skip_leaf_dirs && ctx->current_depth == max_depth) {
+            /* We don't care about this leaf directory. */
+            status = NT_STATUS_OK;
+			goto out;
+		}
+
 		/* Work out the directory. */
 		unresolved = sanitize_dirname(ctx, ctx->dir->dirname);
 		if (!unresolved) {
@@ -1778,8 +1784,7 @@ static NTSTATUS cacl_dump_dacl_cb(struct file_info *f,
 			goto out;
 		}
 
-		if (!(skip_leaf_dirs && ctx->current_depth == max_depth) &&
-		    write_dacl(ctx,
+		if (write_dacl(ctx,
 			       item->targetcli,
 			       item->targetpath, unresolved) != EXIT_OK) {
 			status = NT_STATUS_UNSUCCESSFUL;
